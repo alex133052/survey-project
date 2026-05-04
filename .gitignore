@@ -1,0 +1,23 @@
+# Python кэш
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Виртуальное окружение
+.venv/
+venv/
+env/
+
+# IDE настройки
+.vscode/
+.idea/
+*.swp
+
+# Базы данных и временные файлы (не грузим в репозиторий)
+data/*.db
+data/*.csv
+data/survey_export.csv
+
+# Системные
+.DS_Store
+Thumbs.db

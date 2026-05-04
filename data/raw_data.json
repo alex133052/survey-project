@@ -1,0 +1,6 @@
+[
+    {"name ": "Алексей ", "city ": "Москва ", "status ": "active "},
+    {"name ": "Мария ", "city ": "Санкт-Петербург ", "status ": "inactive "},
+    {"name ": "Дмитрий ", "city ": "Казань ", "status ": "active "},
+    {"name ": "Елена ", "city ": "Новосибирск ", "status ": "pending "}
+]
