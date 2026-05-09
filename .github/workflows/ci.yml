@@ -44,6 +44,7 @@ jobs:
         DATABASE_URL: postgresql://postgres:test_password@localhost:5432/survey_test
         DATABASE_HOST: localhost
         DATABASE_PASSWORD: test_password
+        DATABASE_NAME: survey_test
       run: |
         pytest tests/ -v
 
