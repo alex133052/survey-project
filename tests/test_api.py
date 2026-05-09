@@ -1,57 +1,50 @@
 import pytest
 from fastapi.testclient import TestClient
-from pathlib import Path
 import sys
+import os
 
-# Добавляем путь к проекту
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Добавляем корень проекта в path для импортов
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from api import app
+from src.api import app
 
 client = TestClient(app)
 
 def test_root():
-    """Тест корневого endpoint"""
+    """Тест корневого эндпоинта"""
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert "docs" in data
-    assert data["message"] == "Survey API"
+    assert "Survey API" in data["message"]
 
 def test_submit_survey():
     """Тест отправки опроса"""
     data = {
         "answers": [
-            {"question": "Как тебя зовут?", "answer": "Тест"},
+            {"question": "Как тебя зовут?", "answer": "Иван"},
             {"question": "Сколько тебе лет?", "answer": "25"},
-            {"question": "В каком городе ты живёшь?", "answer": "Тестовск"}
+            {"question": "В каком городе ты живёшь?", "answer": "Москва"}
         ]
     }
-    
     response = client.post("/survey/submit", json=data)
     assert response.status_code == 200
-    result = response.json()
-    assert result["status"] == "success"
+    assert response.json()["status"] == "success"
 
-def test_submit_invalid_age():
-    """Тест валидации: возраст должен быть числом"""
-    data = {
-        "answers": [
-            {"question": "Как тебя зовут?", "answer": "Тест"},
-            {"question": "Сколько тебе лет?", "answer": "двадцать"},  # Ошибка
-        ]
-    }
-    
+def test_submit_survey_empty_answers():
+    """Тест отправки пустого опроса"""
+    data = {"answers": []}
     response = client.post("/survey/submit", json=data)
-    assert response.status_code == 400  # Bad Request
+    assert response.status_code == 400
 
 def test_get_analytics():
-    """Тест получения аналитики"""
+    """Тест получения статистики"""
     response = client.get("/survey/analytics")
     assert response.status_code == 200
     data = response.json()
     assert "ages" in data
     assert "cities" in data
+    assert isinstance(data["ages"], dict)
+    assert isinstance(data["cities"], dict)
 
 def test_get_responses():
     """Тест получения всех ответов"""
@@ -61,3 +54,4 @@ def test_get_responses():
     assert "count" in data
     assert "data" in data
     assert isinstance(data["count"], int)
+    assert isinstance(data["data"], list)

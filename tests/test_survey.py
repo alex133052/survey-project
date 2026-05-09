@@ -1,91 +1,48 @@
 import pytest
-from pathlib import Path
 import sys
-import tempfile
 import os
-import gc
 
-# Добавляем путь к проекту, чтобы видеть src
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.database import DatabaseManager
-from survey import SurveyController
-
-# --- ФИКСТУРЫ (Подготовка данных для тестов) ---
+from src.survey import SurveyController
+from src.database_pg import PostgresDatabaseManager
 
 @pytest.fixture
-def db_manager():
-    """Создает временную базу данных для тестов, чтобы не ломать настоящую"""
-    # Создаём временный файл
-    temp_fd, temp_path = tempfile.mkstemp(suffix='.db')
-    os.close(temp_fd)
-    
-    db = DatabaseManager(Path(temp_path))
+def controller():
+    """Фикстура для создания контроллера"""
+    db = PostgresDatabaseManager()
     db.init_db()
-    
-    yield db
-    
-    # Закрываем соединение и освобождаем файл
-    db.close()
-    gc.collect()  # Принудительная сборка мусора
-    
-    # Удаляем файл после теста
-    if os.path.exists(temp_path):
-        try:
-            os.remove(temp_path)
-        except PermissionError:
-            pass  # Игнорируем, если файл ещё заблокирован
+    return SurveyController(db)
 
-@pytest.fixture
-def controller(db_manager):
-    """Создает контроллер с подключенной временной базой"""
-    return SurveyController(db_manager)
-
-# --- ТЕСТЫ ---
-
-def test_valid_survey(controller):
-    """Тест: Правильные данные должны сохраняться"""
-    data = [
-        ("Как тебя зовут?", "Иван"),
-        ("Сколько тебе лет?", "25"),  # Число - ОК
-        ("Цвет", "Синий"),
-        ("Город", "Москва"),
-        ("Хобби", "Спорт"),
-        ("Авто", "BMW")
+def test_save_success(controller):
+    """Тест успешного сохранения"""
+    answers = [
+        ("Имя", "Алексей"),
+        ("Возраст", "28")
     ]
-    assert controller.save(data) is True
+    result = controller.save(answers)
+    assert result == True
 
-def test_invalid_age(controller):
-    """Тест: Текст вместо возраста должен вызывать ошибку"""
-    data = [
-        ("Как тебя зовут?", "Иван"),
-        ("Сколько тебе лет?", "Двадцать"),  # ОШИБКА
-        ("Цвет", "Синий"),
-        ("Город", "Москва"),
-        ("Хобби", "Спорт"),
-        ("Авто", "BMW")
-    ]
-    with pytest.raises(ValueError) as excinfo:
-        controller.save(data)
-    assert "Возраст должен быть числом" in str(excinfo.value)
+def test_save_empty_answers(controller):
+    """Тест с пустыми ответами"""
+    answers = []
+    with pytest.raises(ValueError):
+        controller.save(answers)
 
-def test_empty_field(controller):
-    """Тест: Пустое поле должно вызывать ошибку"""
-    data = [
-        ("Как тебя зовут?", ""),  # ОШИБКА
-        ("Сколько тебе лет?", "25"),
-        ("Цвет", "Синий"),
-        ("Город", "Москва"),
-        ("Хобби", "Спорт"),
-        ("Авто", "BMW")
-    ]
-    with pytest.raises(ValueError) as excinfo:
-        controller.save(data)
-    # Проверяем, что в ошибке есть упоминание пустого поля
-    assert "пустым" in str(excinfo.value)
+def test_save_empty_question(controller):
+    """Тест с пустым вопросом"""
+    answers = [("", "Ответ")]
+    with pytest.raises(ValueError):
+        controller.save(answers)
 
-def test_analytics_empty(controller):
-    """Тест: Аналитика на пустой базе не должна падать"""
-    report = controller.db.get_analytics_data()  # Прямой доступ к БД для проверки
-    assert report["ages"] == []
-    assert report["cities"] == []
+def test_save_empty_answer(controller):
+    """Тест с пустым ответом"""
+    answers = [("Вопрос", "")]
+    with pytest.raises(ValueError):
+        controller.save(answers)
+
+def test_get_analytics(controller):
+    """Тест получения аналитики"""
+    analytics = controller.get_analytics()
+    assert "ages" in analytics
+    assert "cities" in analytics

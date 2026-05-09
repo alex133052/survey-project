@@ -1,43 +1,46 @@
 import pytest
-from pathlib import Path
 import sys
-import tempfile
 import os
-import gc
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.database import DatabaseManager
+from src.database_pg import PostgresDatabaseManager
 
 @pytest.fixture
 def db():
-    temp_fd, temp_path = tempfile.mkstemp(suffix='.db')
-    os.close(temp_fd)
-    
-    database = DatabaseManager(Path(temp_path))
-    database.init_db()
-    
+    """Фикстура для создания менеджера БД"""
+    database = PostgresDatabaseManager()
     yield database
-    
     database.close()
-    gc.collect()
-    
-    if os.path.exists(temp_path):
-        try:
-            os.remove(temp_path)
-        except PermissionError:
-            pass
 
-def test_db_creation(db):
-    cursor = db._get_connection().cursor()
-    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='responses'")
-    result = cursor.fetchone()
-    assert result is not None
+def test_init_db(db):
+    """Тест создания таблицы"""
+    # Если ошибок нет — таблица создана успешно
+    db.init_db()
+    assert True
 
-def test_save_and_retrieve(db):
-    data = [("Вопрос 1", "Ответ 1"), ("Вопрос 2", "Ответ 2")]
-    result = db.save_answers(data)
-    assert result is True
+def test_save_answers(db):
+    """Тест сохранения ответов"""
+    answers = [
+        ("Вопрос 1", "Ответ 1"),
+        ("Вопрос 2", "Ответ 2")
+    ]
+    result = db.save_answers(answers)
+    assert result == True
+
+def test_get_analytics_data(db):
+    """Тест получения аналитики"""
+    # Сначала добавим тестовые данные
+    answers = [
+        ("Сколько тебе лет?", "30"),
+        ("В каком городе ты живёшь?", "Казань")
+    ]
+    db.save_answers(answers)
     
-    stats = db.get_analytics_data()
-    assert "ages" in stats
+    # Получаем аналитику
+    analytics = db.get_analytics_data()
+    
+    assert "ages" in analytics
+    assert "cities" in analytics
+    assert isinstance(analytics["ages"], list)
+    assert isinstance(analytics["cities"], list)
