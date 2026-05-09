@@ -1,4 +1,5 @@
 import psycopg2
+import os
 from psycopg2.extras import RealDictCursor
 from typing import List, Tuple
 from pathlib import Path
@@ -7,7 +8,13 @@ class PostgresDatabaseManager:
     """Управление базой данных PostgreSQL"""
     
     def __init__(self):
-        self.dsn = "dbname=survey_db user=postgres password=secret host=survey-db port=5432"
+        # Берем хост из переменной окружения, если нет - используем localhost
+        host = os.getenv("DATABASE_HOST", "localhost")
+        
+        # ВАЖНО: В CI/CD пароль будет 'test_password', локально 'secret'
+        password = os.getenv("DATABASE_PASSWORD", "secret")
+        
+        self.dsn = f"dbname=survey_db user=postgres password={password} host={host} port=5432"
         self._conn = None
 
     def _get_connection(self):
