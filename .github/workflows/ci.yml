@@ -38,13 +38,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install uv
         uv pip install --system fastapi uvicorn[standard] pydantic psycopg2-binary pytest pytest-asyncio httpx
-    
+
+    # ШАГ ОТЛАДКИ: Показывает переменные
+    - name: Debug Environment
+      env:
+        DATABASE_HOST: localhost
+        DATABASE_PASSWORD: test_password
+        DATABASE_NAME: survey_test
+      run: |
+        echo "Host is: $DATABASE_HOST"
+        echo "Name is: $DATABASE_NAME"
+
     - name: Run tests
       env:
         DATABASE_URL: postgresql://postgres:test_password@localhost:5432/survey_test
         DATABASE_HOST: localhost
         DATABASE_PASSWORD: test_password
-        DATABASE_NAME: survey_test
+        DATABASE_NAME: survey_test   # <--- ОБЯЗАТЕЛЬНО!
       run: |
         pytest tests/ -v
 
