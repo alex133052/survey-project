@@ -1,74 +1,71 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse  # <--- Добавлено для отдачи HTML
 from pydantic import BaseModel
 from typing import List
-from pathlib import Path
+import os
 
-from .database_pg import PostgresDatabaseManager
-from .survey import SurveyController
+# Импорт нашего класса базы данных
+from src.database_pg import PostgresDatabaseManager
 
-app = FastAPI(title="Survey API", version="1.0.0")
+app = FastAPI()
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
+# Инициализация менеджера базы данных
 db = PostgresDatabaseManager()
-db.init_db()
-controller = SurveyController(db)
 
-class SurveyAnswer(BaseModel):
+# Пытаемся подключиться и создать таблицы при старте приложения
+try:
+    db.init_db()
+    print("✅ Database initialized successfully")
+except Exception as e:
+    print(f"️ Warning: Could not init DB at startup: {e}")
+
+# --- Модели данных (Pydantic) ---
+
+class Answer(BaseModel):
     question: str
     answer: str
 
-class SurveySubmit(BaseModel):
-    answers: List[SurveyAnswer]
+class SurveyRequest(BaseModel):
+    answers: List[Answer]
+
+# --- Маршруты (Routes) ---
 
 @app.get("/")
-def root():
-    return {"message": "Survey API (PostgreSQL)", "docs": "/docs"}
+def read_root():
+    """
+    Главный маршрут. Возвращает HTML-страницу с формой опроса.
+    """
+    # Путь указывается относительно корня проекта (WORKDIR /app в Docker)
+    # Файл index.html лежит в папке src
+    return FileResponse("src/index.html")
 
 @app.post("/survey/submit")
-def submit_survey(data: SurveySubmit):
+def submit_survey(request: SurveyRequest):
+    """
+    Принимает ответы на опрос и сохраняет их в Базу Данных.
+    """
     try:
-        answers_tuple = [(item.question, item.answer) for item in data.answers]
-        success = controller.save(answers_tuple)
+        # Преобразуем список объектов Answer в список кортежей (question, answer)
+        data_to_save = [(ans.question, ans.answer) for ans in request.answers]
+        
+        # Сохраняем в БД
+        success = db.save_answers(data_to_save)
+        
         if success:
             return {"status": "success", "message": "Сохранено"}
-        raise HTTPException(status_code=500, detail="Не удалось сохранить")
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        else:
+            raise HTTPException(status_code=500, detail="Ошибка сохранения в БД")
+            
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/survey/analytics")
 def get_analytics():
+    """
+    Возвращает статистику по ответам.
+    """
     try:
-        raw_data = db.get_analytics_data()
-        ages = {str(row["answer"]): row["cnt"] for row in raw_data["ages"]}
-        cities = {str(row["answer"]): row["cnt"] for row in raw_data["cities"]}
-        return {"ages": ages, "cities": cities}
+        data = db.get_analytics_data()
+        return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/survey/responses")
-def get_responses():
-    try:
-        conn = db._get_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT * FROM responses ORDER BY id DESC")
-            rows = cur.fetchall()
-        return {"count": len(rows), "data": [dict(row) for row in rows]}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/survey/export")
-def export_csv():
-    csv_path = Path(__file__).parent.parent / "data" / "export_api.csv"
-    if db.export_to_csv(csv_path):
-        return {"status": "success", "path": str(csv_path)}
-    raise HTTPException(status_code=500, detail="Ошибка экспорта")
