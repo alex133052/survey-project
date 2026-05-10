@@ -8,15 +8,14 @@ class PostgresDatabaseManager:
     """Управление базой данных PostgreSQL"""
     
     def __init__(self):
-        # Читаем переменные окружения. Если их нет — берем значения по умолчанию
+        # Берем настройки из переменных окружения (для Render) или по умолчанию (для локалки)
         host = os.getenv("DATABASE_HOST", "localhost")
         password = os.getenv("DATABASE_PASSWORD", "secret")
-        db_name = os.getenv("DATABASE_NAME", "survey_db")  # <--- Здесь читается имя базы
+        db_name = os.getenv("DATABASE_NAME", "survey_db")
+        user = os.getenv("DATABASE_USER", "postgres")  # <--- ИСПРАВЛЕНО
         
-        # Для отладки: можно раскомментировать строку ниже, чтобы видеть в логах
-        # print(f"DEBUG: Connecting to {db_name} on {host}")
-
-        self.dsn = f"dbname={db_name} user=postgres password={password} host={host} port=5432"
+        # Формируем строку подключения
+        self.dsn = f"dbname={db_name} user={user} password={password} host={host} port=5432"
         self._conn = None
 
     def _get_connection(self):
